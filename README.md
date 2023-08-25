@@ -1,4 +1,4 @@
-![example workflow](https://github.com/facusapienza21/myproject/actions/workflows/latex.yml/badge.svg)
+![example workflow](https://github.com/facusapienza21/Dynamical-Lasso/actions/workflows/latex.yml/badge.svg)
 
 # My Project
 
@@ -18,7 +18,7 @@ This repository is organized in a way that contains most of the important elemen
 
 ### Continuous integrations
 
-This repository has a [workflow](https://github.com/facusapienza21/myproject/blob/main/.github/workflows/latex.yml) implemented that automatically compiles the latex files into the file `main.pdf` and then commits this file directy to the repository. 
+This repository has a [workflow](https://github.com/facusapienza21/Dynamical-Lasso/blob/main/.github/workflows/latex.yml) implemented that automatically compiles the latex files into the file `main.pdf` and then commits this file directy to the repository. 
 If you are working from your fork, this action should also work and you should be able to generate the pdf file automatically using GitHub actions. 
 
 ### Makefile
