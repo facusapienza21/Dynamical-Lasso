@@ -29,7 +29,7 @@ where $f_i$ is an evolution function.
 For many cases, this function will be linear and can be directly be described as 
 \begin{equation}
     x_{i+1} = A_i(\theta_i) \, x_i + b_i(\theta_i)
-    \label{eq:}
+    \label{eq:ode-discrete}
 \end{equation}
 with $A_i \in \R^{n \times n}$ and $b \in \R^n$.
 
@@ -51,10 +51,15 @@ A second approach consists in working directly with the discrete dynamical syste
 \begin{equation}
     \min_{\theta_1, \theta_2, \ldots, \theta_N}
     \sum_{i=1}^N
-    \| y_i - x_i \|_2^2
+    \| y_i - x_i(\theta) \|_2^2
     + 
     \lambda
     \sum_{i=1}^{N-1}
     \| \theta_{i+1} - \theta_i \|_2
 \end{equation}
-subject to the constraint 
+subject to the constraint in Equation \eqref{eq:ode-discrete}.
+The penalization term here correspond to a group lasso penalization of the hypervector $\theta = (\theta_1, \ldots, \theta_N) \in \R^{Np}$ \cite{hastie2015sparsity}.
+For the one dimensional case $p=1$, the penalization term coincides with one dimensional fussed lasso and the second order trend filtering \cite{tibs-taylor-2011, tibs-trend-filter}.  
+
+In both cases, the loss function is build following the analysis approach \cite{synthesis-analysis}. 
+A forward map is used to construct the expected solution based on the input parameters, and the penalization is build as an energy term between these parameters. 
