@@ -1,13 +1,15 @@
+using Pkg
+Pkg.activate("DynLasso")
 
 using LinearAlgebra, Statistics
 using OrdinaryDiffEq
-using Lux, Zygote
+using Lux, Zygote#, Enzyme
 using Optim, Optimisers
 using SciMLSensitivity
 using Optimization, OptimizationOptimisers, OptimizationOptimJL
 using ComponentArrays # for Component Array
 using CairoMakie
-
+using Distributions 
 
 using Infiltrator
 
@@ -21,6 +23,8 @@ u0 = [0.0, 0.0, -1.0]
 p = 0.1 .* [1.0, 0.0, 0.0]
 reltol = 1e-7
 abstol = 1e-7
+κ = 20000 # Fisher concentration parameter on observations (small = more dispersion)
+λ = 0.1
 
 ####################################################
 #############    Real Solution     #################
@@ -31,22 +35,34 @@ abstol = 1e-7
 # Angular velocity 
 ω₀ = Δω₀ * π / 180.0
 # Angular momentum
-L0 = ω₀ .* [1.0, 0.0, 0.0]
+τ₀ = 60.0
+L0 = ω₀    .* [1.0, 0.0, 0.0]
+L1 = 0.5ω₀ .* [0.0, sqrt(2), sqrt(2)]
 
 function true_rotation!(du, u, p, t)
-    du .= cross(p, u)
+    if t < τ₀
+        L = p[1]
+    else 
+        L = p[2]
+    end
+    du .= cross(L, u)
 end
 
-prob = ODEProblem(true_rotation!, u0, tspan, L0)
+prob = ODEProblem(true_rotation!, u0, tspan, [L0, L1])
 true_sol  = solve(prob, Tsit5(), reltol=reltol, abstol=abstol)
-X_true = Array(true_sol)
 times = true_sol.t
 
-fig = Figure(resolution=(900, 500)) 
-ax = CairoMakie.Axis(fig[1, 1], xlabel = L"Stepsize ($\varepsilon$)", ylabel = L"\text{Relative error}")
+### Add Fisher noise to true solution 
+X_noiseless = Array(true_sol)
+X_true = mapslices(x -> rand(sampler(VonMisesFisher(x, κ)), 1), X_noiseless, dims=1)
 
-scatter!(ax, times, (x -> x[2]).(true_sol.u), label="second coordinate")#, alpha = 0.75, color = :black, label = ["True Data" nothing])
-scatter!(ax, times, (x -> x[3]).(true_sol.u), label="third coordinate")
+
+fig = Figure(resolution=(900, 500)) 
+ax = CairoMakie.Axis(fig[1, 1], xlabel = "Time", ylabel = "Value")
+
+scatter!(ax, times, X_true[1,:], label="first coordinate")#, alpha = 0.75, color = :black, label = ["True Data" nothing])
+scatter!(ax, times, X_true[2,:], label="second coordinate")#, alpha = 0.75, color = :black, label = ["True Data" nothing])
+scatter!(ax, times, X_true[3,:], label="third coordinate")
 
 # Add legend
 fig[1, 2] = Legend(fig, ax)
@@ -103,14 +119,29 @@ end
 
 function loss(θ)
     u_ = predict(θ)
+
     # Empirical error
     l_emp = mean(abs2, u_ .- X_true)
+
     # Regularization
-    # here ideally we want the derivative respect to the inpur directly 
-    # L_ = U(times, θ, st)[1]
-    # l_reg = 
-    # sum((u_[end] .- [0.0, 0.0, 1.0]).^2)
-    return l_emp
+    l_reg = 0.0
+    times_reg = collect(tspan[1]:5.0:tspan[2])
+    for i in 1:(size(times_reg)[1]-1)
+        # Solution using AD
+    #     # this works, but it is slow!!!
+    #     l_reg_t = norm(jacobian(x -> U([x], p, st)[1], t)[1])
+        # Discrete solution
+        t0 = times_reg[i]
+        t1 = times_reg[i+1]
+        l_reg_t = norm(U([t1], θ, st)[1] .- U([t0], θ, st)[1])
+        # @show l_reg_t
+        l_reg += l_reg_t
+    end
+    l_reg /= size(times_reg)[1]
+
+    # @show l_emp, λ * l_reg
+
+    return l_emp + λ * l_reg
 end
 
 losses = Float64[]
@@ -126,16 +157,17 @@ adtype = Optimization.AutoZygote()
 optf = Optimization.OptimizationFunction((x, p) -> loss(x), adtype)
 optprob = Optimization.OptimizationProblem(optf, ComponentVector{Float64}(p))
 
-res1 = Optimization.solve(optprob, ADAM(), callback = callback, maxiters = 500)
+res1 = Optimization.solve(optprob, ADAM(0.002), callback = callback, maxiters = 4000)
 println("Training loss after $(length(losses)) iterations: $(losses[end])")
 
 optprob2 = Optimization.OptimizationProblem(optf, res1.u)
-res2 = Optimization.solve(optprob2, Optim.LBFGS(), callback = callback, maxiters = 100)
+res2 = Optimization.solve(optprob2, Optim.LBFGS(), callback = callback, maxiters = 400)
 println("Final training loss after $(length(losses)) iterations: $(losses[end])")
 
 p_trained = res2.u
 u_final = predict(p_trained)
 
+lines!(ax, times, u_final[1,:], label="ODE first coordinate")
 lines!(ax, times, u_final[2,:], label="ODE second coordinate")
 lines!(ax, times, u_final[3,:], label="ODE third coordinate")
 
@@ -143,14 +175,19 @@ save("solution_ODE.pdf", fig)
 
 
 fig = Figure(resolution=(900, 500)) 
-ax = CairoMakie.Axis(fig[1, 1], xlabel = L"Stepsize ($\varepsilon$)", ylabel = L"\text{Relative error}")
-
-hlines!(ax, L0, label="Reference")#, alpha = 0.75, color = :black, label = ["True Data" nothing])
+ax = CairoMakie.Axis(fig[1, 1], xlabel = L"Time", ylabel = "Value")
 
 Ls = reduce(hcat, (t -> U([t], p_trained, st)[1]).(times))
 
 scatter!(ax, times, Ls[1,:], label="ODE first coordinate")
 scatter!(ax, times, Ls[2,:], label="ODE second coordinate")
 scatter!(ax, times, Ls[3,:], label="ODE third coordinate")
+
+hlines!(ax, vcat(L0, L1), 
+            xmin=vcat(repeat([0.0], 3), repeat([0.5], 3)), 
+            xmax=vcat(repeat([0.5], 3), repeat([1.0], 3)))
+vlines!(ax, [τ₀])
+
+fig[1, 2] = Legend(fig, ax)
 
 save("solution_L.pdf", fig)
