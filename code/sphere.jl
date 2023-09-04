@@ -129,12 +129,12 @@ function loss(θ)
     for i in 1:(size(times_reg)[1]-1)
         # Solution using AD
     #     # this works, but it is slow!!!
-    #     l_reg_t = norm(jacobian(x -> U([x], p, st)[1], t)[1])
+        # t = times_reg[i]
+        # l_reg .+= norm(jacobian(x -> U([x], p, st)[1], t)[1]) 
         # Discrete solution
         t0 = times_reg[i]
         t1 = times_reg[i+1]
         l_reg_t = norm(U([t1], θ, st)[1] .- U([t0], θ, st)[1])
-        # @show l_reg_t
         l_reg += l_reg_t
     end
     l_reg /= size(times_reg)[1]
@@ -157,7 +157,7 @@ adtype = Optimization.AutoZygote()
 optf = Optimization.OptimizationFunction((x, p) -> loss(x), adtype)
 optprob = Optimization.OptimizationProblem(optf, ComponentVector{Float64}(p))
 
-res1 = Optimization.solve(optprob, ADAM(0.002), callback = callback, maxiters = 4000)
+res1 = Optimization.solve(optprob, ADAM(0.002), callback = callback, maxiters = 2000)
 println("Training loss after $(length(losses)) iterations: $(losses[end])")
 
 optprob2 = Optimization.OptimizationProblem(optf, res1.u)
@@ -171,7 +171,7 @@ lines!(ax, times, u_final[1,:], label="ODE first coordinate")
 lines!(ax, times, u_final[2,:], label="ODE second coordinate")
 lines!(ax, times, u_final[3,:], label="ODE third coordinate")
 
-save("solution_ODE.pdf", fig)
+save("sphere_solution.pdf", fig)
 
 
 fig = Figure(resolution=(900, 500)) 
@@ -190,4 +190,4 @@ vlines!(ax, [τ₀])
 
 fig[1, 2] = Legend(fig, ax)
 
-save("solution_L.pdf", fig)
+save("sphere_parameter.pdf", fig)
