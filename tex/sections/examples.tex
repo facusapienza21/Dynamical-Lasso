@@ -79,3 +79,13 @@ Mathematically speaking, we can describe any path on the sphere with initial con
 \end{equation}
 with $L(t) \in \R^3$ the angular momentum vector, that is, a vector with norm $\| L \|_2 = \omega$ equals to the angular velocity, and direction parallel to the axis rotation. 
 Notice that for every choice of $L(t)$, the solution satisfies $\| x(t) \|_2 = 1$ for all times.
+
+\subsection{General path on a manifold}
+
+Given a manifold $\mathcal M \subset \R^3$ (this can be generalized to other dimensions), we can represent any possible continuous curve on $\mathcal M$ as the solution of the ordinary differential equation
+\begin{equation}
+    \frac{dx}{dt}
+    = 
+    L(t) \times n(x),
+\end{equation} 
+with $n(x)$ the normal vector to the manifold 
